@@ -1,5 +1,6 @@
 package com.example.android.pets.data;
 
+import android.bluetooth.le.ScanSettings;
 import android.content.ContentProvider;
 import android.content.ContentUris;
 import android.content.ContentValues;
@@ -9,8 +10,11 @@ import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.util.Log;
 
 public class PetProvider extends ContentProvider {
+
+    public static final String LOG_TAG = PetProvider.class.getSimpleName();
 
     PetDbHelper mDbHelper;
     private static final int PETS = 100;
@@ -47,7 +51,7 @@ public class PetProvider extends ContentProvider {
                 cursor = database.query(PetContract.PetEntry.TABLE_NAME, projection, selection, selectionArgs, null, null, sortOrder);
                 break;
             default:
-                throw new IllegalAccessException("Unknown URI " + uri);
+                throw new IllegalArgumentException("Insertion is not supported for " + uri);
         }
         return cursor;
     }
@@ -55,22 +59,109 @@ public class PetProvider extends ContentProvider {
     @Nullable
     @Override
     public String getType(@NonNull Uri uri) {
-        return null;
+        final int match = sUriMatcher.match(uri);
+        switch (match){
+            case PETS:
+                return PetContract.CONTENT_LIST_TYPE;
+            case PET_ID:
+                return PetContract.CONTENT_ITEM_TYPE;
+            default:
+                throw new IllegalArgumentException("Unknown URI " + uri + " with match " + match);
+        }
     }
 
     @Nullable
     @Override
     public Uri insert(@NonNull Uri uri, @Nullable ContentValues values) {
-        return null;
+        String currentName = values.getAsString(PetContract.PetEntry.COLUMN_PET_NAME);
+        if(currentName.isEmpty()) throw new IllegalArgumentException("Pet requires a name");
+
+        Integer currentWeight = values.getAsInteger(PetContract.PetEntry.COLUMN_PET_WEIGHT);
+        if (currentWeight != null && currentWeight < 0) throw new IllegalArgumentException("Pet requires a weight");
+
+        Integer currentGender = values.getAsInteger(PetContract.PetEntry.COLUMN_PET_GENDER);
+        if (currentGender == null || !PetContract.PetEntry.isValidGender(currentGender))
+            throw new IllegalArgumentException("Pet requires a gender");
+
+        final int match = sUriMatcher.match(uri);
+        switch (match){
+            case PETS:
+                return insertPet(uri, values);
+            default:
+                throw new IllegalArgumentException("Insertion is not supported for " + uri);
+        }
+    }
+
+    private Uri insertPet(Uri uri, ContentValues contentValues){
+        SQLiteDatabase database = mDbHelper.getWritableDatabase();
+        long id = database.insert(PetContract.PetEntry.TABLE_NAME, null, contentValues);
+        if(id == -1) {
+            Log.e(LOG_TAG,"Failed to insert row for " + uri);
+            return null;
+        }
+        return ContentUris.withAppendedId(uri, id);
     }
 
     @Override
     public int delete(@NonNull Uri uri, @Nullable String selection, @Nullable String[] selectionArgs) {
-        return 0;
+        SQLiteDatabase database = mDbHelper.getWritableDatabase();
+
+        final int match = sUriMatcher.match(uri);
+        switch (match) {
+            case PETS:
+                return database.delete(PetContract.PetEntry.TABLE_NAME, selection, selectionArgs);
+            case PET_ID:
+                selection = PetContract.PetEntry._ID + "=?";
+                selectionArgs = new String[]{String.valueOf(ContentUris.parseId(uri))};
+                return database.delete(PetContract.PetEntry.TABLE_NAME, selection, selectionArgs);
+            default:
+                throw new IllegalArgumentException("Update is not supported for " + uri);
+        }
     }
 
     @Override
     public int update(@NonNull Uri uri, @Nullable ContentValues values, @Nullable String selection, @Nullable String[] selectionArgs) {
-        return 0;
+
+
+        final int match = sUriMatcher.match(uri);
+        switch (match){
+            case PETS:
+                return updatePet(uri, values, selection, selectionArgs);
+            case PET_ID:
+                selection = PetContract.PetEntry._ID + "=?";
+                selectionArgs = new String[]{String.valueOf(ContentUris.parseId(uri))};
+                return updatePet(uri, values, selection, selectionArgs);
+            default: throw new IllegalArgumentException("Update is not supported for " + uri);
+        }
+    }
+
+    private int updatePet(Uri uri, ContentValues contentValues, String selection, String[] selectionArgs){
+        if (contentValues.size() == 0) return 0;
+
+        if (contentValues.containsKey(PetContract.PetEntry.COLUMN_PET_NAME)) {
+            String currentName = contentValues.getAsString(PetContract.PetEntry.COLUMN_PET_NAME);
+            if (currentName.isEmpty())
+                throw new IllegalArgumentException("Pet requires a name");
+        }
+
+        if (contentValues.containsKey(PetContract.PetEntry.COLUMN_PET_WEIGHT)) {
+            Integer currentWeight = contentValues.getAsInteger(PetContract.PetEntry.COLUMN_PET_WEIGHT);
+            if (currentWeight != null && currentWeight < 0)
+                throw new IllegalArgumentException("Pet requires a weight");
+        }
+
+        if (contentValues.containsKey(PetContract.PetEntry.COLUMN_PET_GENDER)) {
+            Integer currentGender = contentValues.getAsInteger(PetContract.PetEntry.COLUMN_PET_GENDER);
+            if (currentGender == null || !PetContract.PetEntry.isValidGender(currentGender))
+                throw new IllegalArgumentException("Pet requires a gender");
+        }
+
+        SQLiteDatabase database = mDbHelper.getWritableDatabase();
+        int id = database.update(PetContract.PetEntry.TABLE_NAME, contentValues, selection, selectionArgs);
+        if(id == -1) {
+            Log.e(LOG_TAG, "Failed to udate row for " + uri);
+            return 0;
+        }
+        return id;
     }
 }
