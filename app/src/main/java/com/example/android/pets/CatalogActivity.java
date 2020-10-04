@@ -1,20 +1,6 @@
-/*
- * Copyright (C) 2016 The Android Open Source Project
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package com.example.android.pets;
 
+import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.database.Cursor;
@@ -22,10 +8,14 @@ import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
+import android.support.v4.app.LoaderManager;
+import android.support.v4.content.CursorLoader;
+import android.support.v4.content.Loader;
 import android.support.v7.app.AppCompatActivity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.TextView;
 
@@ -36,10 +26,12 @@ import com.example.android.pets.data.PetDbHelper;
 /**
  * Displays list of pets that were entered and stored in the app.
  */
-public class CatalogActivity extends AppCompatActivity {
+public class CatalogActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<Cursor> {
 
-    /** Database helper that will provide us access to the database */
+    private static final  int PET_LOADER = 0;
+    PetCursorAdapter mAdapter;
     private PetDbHelper mDbHelper;
+    LoaderManager.LoaderCallbacks<Cursor> a = this;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,38 +48,30 @@ public class CatalogActivity extends AppCompatActivity {
             }
         });
 
-        // To access our database, we instantiate our subclass of SQLiteOpenHelper
-        // and pass the context, which is the current activity.
         mDbHelper = new PetDbHelper(this);
 
-        displayDatabaseInfo();
+        ListView petListView = (ListView) findViewById(R.id.list);
+
+        View emptyView = findViewById(R.id.empty_view);
+        petListView.setEmptyView(emptyView);
+
+
+        mAdapter = new PetCursorAdapter(this, null);
+        petListView.setAdapter(mAdapter);
+
+        petListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int position, long id) {
+                Intent intent = new Intent(CatalogActivity.this, EditorActivity.class);
+                Uri currentUri = ContentUris.withAppendedId(PetContract.CONTENT_URI, id);
+                intent.setData(currentUri);
+                startActivity(intent);
+            }
+        });
+
+        getSupportLoaderManager().initLoader(PET_LOADER, null, this);
     }
 
-    /**
-     * Temporary helper method to display information in the onscreen TextView about the state of
-     * the pets database.
-     */
-    private void displayDatabaseInfo() {
-
-        String [] project = {
-                PetEntry._ID,
-                PetEntry.COLUMN_PET_NAME,
-                PetEntry.COLUMN_PET_BREED,
-                PetEntry.COLUMN_PET_GENDER,
-                PetEntry.COLUMN_PET_WEIGHT
-        };
-
-        Cursor cursor = getContentResolver().query(PetContract.CONTENT_URI, project, null, null, null);
-
-        ListView listView = (ListView)findViewById(R.id.list);
-        PetCursorAdapter adapter = new PetCursorAdapter(this, cursor);
-        listView.setAdapter(adapter);
-
-    }
-
-    /**
-     * Helper method to insert hardcoded pet data into the database. For debugging purposes only.
-     */
     private void insertPet() {
         // Gets the database in write mode
         SQLiteDatabase db = mDbHelper.getWritableDatabase();
@@ -125,7 +109,6 @@ public class CatalogActivity extends AppCompatActivity {
             // Respond to a click on the "Insert dummy data" menu option
             case R.id.action_insert_dummy_data:
                 insertPet();
-                displayDatabaseInfo();
                 return true;
             // Respond to a click on the "Delete all entries" menu option
             case R.id.action_delete_all_entries:
@@ -136,8 +119,27 @@ public class CatalogActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onStart() {
-        super.onStart();
-        displayDatabaseInfo();
+    public Loader<Cursor> onCreateLoader(int id, Bundle args) {
+        String [] project = {
+                PetEntry._ID,
+                PetEntry.COLUMN_PET_NAME,
+                PetEntry.COLUMN_PET_BREED };
+
+        switch (id) {
+            case (PET_LOADER):
+                return new CursorLoader(this, PetContract.CONTENT_URI, project, null, null, null);
+            default:
+                return null;
+        }
+    }
+
+    @Override
+    public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
+        mAdapter.swapCursor(data);
+    }
+
+    @Override
+    public void onLoaderReset(Loader<Cursor> loader) {
+        mAdapter.swapCursor(null);
     }
 }

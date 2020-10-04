@@ -53,6 +53,9 @@ public class PetProvider extends ContentProvider {
             default:
                 throw new IllegalArgumentException("Insertion is not supported for " + uri);
         }
+
+        cursor.setNotificationUri(getContext().getContentResolver(),uri);
+
         return cursor;
     }
 
@@ -99,6 +102,7 @@ public class PetProvider extends ContentProvider {
             Log.e(LOG_TAG,"Failed to insert row for " + uri);
             return null;
         }
+        getContext().getContentResolver().notifyChange(uri, null);
         return ContentUris.withAppendedId(uri, id);
     }
 
@@ -106,23 +110,28 @@ public class PetProvider extends ContentProvider {
     public int delete(@NonNull Uri uri, @Nullable String selection, @Nullable String[] selectionArgs) {
         SQLiteDatabase database = mDbHelper.getWritableDatabase();
 
+        int rowsDeleted;
         final int match = sUriMatcher.match(uri);
         switch (match) {
             case PETS:
-                return database.delete(PetContract.PetEntry.TABLE_NAME, selection, selectionArgs);
+                rowsDeleted = database.delete(PetContract.PetEntry.TABLE_NAME, selection, selectionArgs);
+                break;
             case PET_ID:
                 selection = PetContract.PetEntry._ID + "=?";
                 selectionArgs = new String[]{String.valueOf(ContentUris.parseId(uri))};
-                return database.delete(PetContract.PetEntry.TABLE_NAME, selection, selectionArgs);
+                rowsDeleted = database.delete(PetContract.PetEntry.TABLE_NAME, selection, selectionArgs);
+                break;
             default:
                 throw new IllegalArgumentException("Update is not supported for " + uri);
         }
+        if (rowsDeleted != 0)
+            getContext().getContentResolver().notifyChange(uri, null);
+
+        return rowsDeleted;
     }
 
     @Override
     public int update(@NonNull Uri uri, @Nullable ContentValues values, @Nullable String selection, @Nullable String[] selectionArgs) {
-
-
         final int match = sUriMatcher.match(uri);
         switch (match){
             case PETS:
@@ -162,6 +171,8 @@ public class PetProvider extends ContentProvider {
             Log.e(LOG_TAG, "Failed to udate row for " + uri);
             return 0;
         }
+        if (id != 0)
+            getContext().getContentResolver().notifyChange(uri, null);
         return id;
     }
 }
