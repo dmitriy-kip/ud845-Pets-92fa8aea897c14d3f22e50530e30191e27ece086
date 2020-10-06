@@ -28,10 +28,9 @@ import com.example.android.pets.data.PetDbHelper;
  */
 public class CatalogActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<Cursor> {
 
-    private static final  int PET_LOADER = 0;
+    private static final int PET_LOADER = 0;
     PetCursorAdapter mAdapter;
     private PetDbHelper mDbHelper;
-    LoaderManager.LoaderCallbacks<Cursor> a = this;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
