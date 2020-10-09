@@ -25,6 +25,8 @@ import com.example.android.pets.data.PetContract;
 import com.example.android.pets.data.PetContract.PetEntry;
 import com.example.android.pets.data.PetDbHelper;
 
+import org.w3c.dom.Text;
+
 /**
  * Allows user to create a new pet or edit an existing one.
  */
@@ -120,16 +122,18 @@ public class EditorActivity extends AppCompatActivity implements LoaderManager.L
     private void insertPet(){
         String nameString = mNameEditText.getText().toString().trim();
         String breedString = mBreedEditText.getText().toString().trim();
-        int weight = Integer.parseInt(mWeightEditText.getText().toString().trim());
+        String weightString = mWeightEditText.getText().toString().trim();
 
-        PetDbHelper mDbHelper = new PetDbHelper(this);
-        SQLiteDatabase db = mDbHelper.getWritableDatabase();
+        if (TextUtils.isEmpty(nameString) || TextUtils.isEmpty(breedString)){
+            Toast.makeText(this, "Cannot save without name and breed.", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         ContentValues values = new ContentValues();
         values.put(PetEntry.COLUMN_PET_NAME, nameString);
         values.put(PetEntry.COLUMN_PET_BREED, breedString);
         values.put(PetEntry.COLUMN_PET_GENDER, mGender);
-        values.put(PetEntry.COLUMN_PET_WEIGHT, weight);
+        values.put(PetEntry.COLUMN_PET_WEIGHT, (TextUtils.isEmpty(weightString) ? 0 : Integer.parseInt(weightString)));
 
         Uri newUri = getContentResolver().insert(PetContract.CONTENT_URI, values);
 
